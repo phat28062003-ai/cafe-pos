@@ -1,0 +1,1656 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kafe POS Pro - Hệ Thống Bán Hàng & Điều Phối Barista</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#fffbeb',
+              100: '#fef3c7',
+              500: '#f59e0b',
+              600: '#d97706',
+              700: '#b45309',
+              800: '#92400e',
+              900: '#78350f',
+            },
+            espresso: {
+              800: '#27201c',
+              900: '#1a1512',
+              950: '#100d0b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f1f1; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-stone-100 text-stone-800 font-sans antialiased h-screen flex flex-col overflow-hidden">
+
+  <!-- TOP NAVIGATION HEADER -->
+  <header class="bg-espresso-900 text-white px-6 py-3 flex items-center justify-between shadow-md shrink-0 border-b border-espresso-800">
+    <div class="flex items-center space-x-4">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-brand-500 flex items-center justify-center text-white shadow-lg shadow-brand-500/30">
+        <i class="fa-solid fa-mug-hot text-xl"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+          KAFE POS PRO <span class="text-xs bg-brand-500/20 text-brand-400 px-2 py-0.5 rounded-full border border-brand-500/30">v2.0 ASGI</span>
+        </h1>
+        <p class="text-xs text-stone-400">Coffee POS, Inventory & Real-Time Barista KDS</p>
+      </div>
+    </div>
+
+    <!-- MAIN APP TABS -->
+    <nav class="flex items-center bg-espresso-950/60 p-1.5 rounded-xl border border-stone-800/80">
+      <button onclick="switchTab('pos')" id="tab-btn-pos" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 bg-brand-600 text-white shadow-sm">
+        <i class="fa-solid fa-cash-register"></i> Quầy Thu Ngân
+      </button>
+      <button onclick="switchTab('kds')" id="tab-btn-kds" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 text-stone-400 hover:text-white">
+        <i class="fa-solid fa-kitchen-set"></i> Barista KDS
+        <span id="pending-badge" class="hidden bg-amber-500 text-espresso-950 text-xs px-1.5 py-0.2 font-bold rounded-full">0</span>
+      </button>
+      <button onclick="switchTab('inventory')" id="tab-btn-inventory" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 text-stone-400 hover:text-white">
+        <i class="fa-solid fa-boxes-stacked"></i> Kho Nguyên Liệu
+        <span id="low-stock-badge" class="hidden bg-rose-500 text-white text-xs px-1.5 py-0.2 font-bold rounded-full">!</span>
+      </button>
+      <button onclick="switchTab('shift')" id="tab-btn-shift" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 text-stone-400 hover:text-white">
+        <i class="fa-solid fa-vault"></i> Ca & Đối Soát
+      </button>
+    </nav>
+
+    <!-- SHIFT & TIME CHIP -->
+    <div class="flex items-center space-x-3">
+      <div id="shift-status-chip" class="bg-stone-800/80 px-3.5 py-1.5 rounded-lg border border-stone-700/60 text-xs flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span id="shift-cashier-label" class="font-medium text-stone-200">Đang kiểm tra ca...</span>
+      </div>
+      <button onclick="quickShiftAction()" id="shift-action-btn" class="bg-stone-800 hover:bg-stone-700 text-stone-200 px-3 py-1.5 rounded-lg text-xs font-semibold border border-stone-700 transition">
+        <i class="fa-solid fa-arrows-rotate"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="flex-1 flex overflow-hidden">
+
+    <!-- ========================================== -->
+    <!-- VIEW 1: POS & BÁN HÀNG (DEFAULT)           -->
+    <!-- ========================================== -->
+    <div id="view-pos" class="view-panel flex-1 flex overflow-hidden">
+      <!-- LEFT PRODUCT SELECTOR -->
+      <div class="flex-1 flex flex-col overflow-hidden p-5 border-r border-stone-200 bg-stone-50">
+        <!-- Search & Category Filters -->
+        <div class="flex items-center justify-between gap-4 mb-4">
+          <!-- Category Chips -->
+          <div id="category-tabs" class="flex items-center gap-2 overflow-x-auto pb-1 max-w-[70%]">
+            <button onclick="filterCategory(null)" class="cat-pill active px-4 py-2 rounded-full text-xs font-semibold bg-brand-600 text-white shadow-sm shrink-0">
+              Tất cả món
+            </button>
+            <!-- Render categories dynamically -->
+          </div>
+          <!-- Search input -->
+          <div class="relative w-64">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 text-sm"></i>
+            <input type="text" id="search-input" oninput="handleSearch(this.value)" placeholder="Tìm món nhanh..." 
+                   class="w-full pl-9 pr-3 py-2 text-sm bg-white rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+        </div>
+
+        <!-- Products Grid -->
+        <div id="products-grid" class="flex-1 overflow-y-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pr-1">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- RIGHT CART & CHECKOUT SIDEBAR -->
+      <div class="w-96 bg-white flex flex-col shadow-lg border-l border-stone-200">
+        <!-- Cart Header -->
+        <div class="p-4 border-b border-stone-200 bg-stone-50 flex items-center justify-between">
+          <div class="flex items-center gap-2 font-bold text-stone-800">
+            <i class="fa-solid fa-basket-shopping text-brand-600"></i>
+            <span>Giỏ Đơn Hàng</span>
+            <span id="cart-count-badge" class="bg-brand-100 text-brand-800 text-xs px-2 py-0.5 rounded-full">0</span>
+          </div>
+          <button onclick="clearCart()" class="text-xs text-rose-600 hover:text-rose-700 font-medium">
+            <i class="fa-regular fa-trash-can"></i> Xóa tất cả
+          </button>
+        </div>
+
+        <!-- Dine-in / Takeaway & Table Input -->
+        <div class="p-3 bg-stone-100/60 border-b border-stone-200 flex gap-2 text-xs">
+          <div class="flex-1 bg-white p-1 rounded-lg border border-stone-300 flex">
+            <button type="button" onclick="setTakeaway(false)" id="btn-dinein" class="flex-1 py-1.5 rounded-md font-semibold transition bg-brand-600 text-white text-center">
+              <i class="fa-solid fa-chair mr-1"></i> Tại bàn
+            </button>
+            <button type="button" onclick="setTakeaway(true)" id="btn-takeaway" class="flex-1 py-1.5 rounded-md font-semibold transition text-stone-600 text-center">
+              <i class="fa-solid fa-bag-shopping mr-1"></i> Mang đi
+            </button>
+          </div>
+          <div class="w-28" id="table-number-wrapper">
+            <input type="text" id="cart-table-number" placeholder="Số bàn..." 
+                   class="w-full h-full px-2.5 py-1.5 text-xs bg-white rounded-lg border border-stone-300 focus:outline-none focus:ring-1 focus:ring-brand-500 font-semibold">
+          </div>
+        </div>
+
+        <!-- Cart Items List -->
+        <div id="cart-items-list" class="flex-1 overflow-y-auto p-3 space-y-2">
+          <!-- Rendered dynamically -->
+          <div class="h-full flex flex-col items-center justify-center text-stone-400 text-center p-6">
+            <i class="fa-solid fa-mug-saucer text-4xl mb-3 text-stone-300"></i>
+            <p class="text-sm font-medium">Chưa có món nào được chọn</p>
+            <p class="text-xs text-stone-400 mt-1">Bấm vào các món bên trái để bắt đầu thêm vào đơn</p>
+          </div>
+        </div>
+
+        <!-- Cart Summary & Payment -->
+        <div class="p-4 border-t border-stone-200 bg-stone-50/70 space-y-3">
+          <div class="space-y-1.5 text-xs text-stone-600">
+            <div class="flex justify-between">
+              <span>Tạm tính:</span>
+              <span id="cart-subtotal" class="font-semibold text-stone-800">0 đ</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span>Giảm giá (VND):</span>
+              <input type="number" id="cart-discount" oninput="updateCartTotals()" value="0" min="0" step="1000"
+                     class="w-24 text-right px-2 py-0.5 border border-stone-300 rounded text-xs focus:ring-1 focus:ring-brand-500">
+            </div>
+            <div class="flex justify-between text-base font-bold text-stone-900 pt-2 border-t border-stone-200">
+              <span>Tổng thanh toán:</span>
+              <span id="cart-total" class="text-brand-600 text-lg">0 đ</span>
+            </div>
+          </div>
+
+          <!-- Payment Method Selector -->
+          <div class="grid grid-cols-2 gap-2 text-xs pt-1">
+            <button onclick="setPaymentMethod('CASH')" id="btn-pay-cash" class="py-2 px-3 rounded-lg border font-semibold flex items-center justify-center gap-2 border-brand-500 bg-brand-50 text-brand-800">
+              <i class="fa-solid fa-money-bill-wave"></i> Tiền mặt
+            </button>
+            <button onclick="setPaymentMethod('TRANSFER')" id="btn-pay-transfer" class="py-2 px-3 rounded-lg border font-semibold flex items-center justify-center gap-2 border-stone-300 text-stone-700 bg-white hover:bg-stone-50">
+              <i class="fa-solid fa-qrcode"></i> Chuyển khoản QR
+            </button>
+          </div>
+
+          <!-- Quick Note -->
+          <input type="text" id="cart-order-note" placeholder="Ghi chú toàn đơn (ví dụ: khách quen, ưu tiên gấp)..." 
+                 class="w-full text-xs px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white">
+
+          <!-- Submit Order Button -->
+          <button onclick="submitOrder()" id="btn-submit-order" class="w-full py-3.5 bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-700 hover:to-brand-600 text-white rounded-xl font-bold shadow-lg shadow-brand-500/30 flex items-center justify-center gap-2 text-sm transition">
+            <i class="fa-solid fa-check"></i> Đặt Món & Trừ Kho Tự Động
+          </button>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- VIEW 2: BARISTA KDS (KITCHEN DISPLAY)      -->
+    <!-- ========================================== -->
+    <div id="view-kds" class="view-panel flex-1 flex flex-col p-5 overflow-hidden bg-stone-900 hidden">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-fire-burner text-brand-500"></i> Điều Phối Pha Chế (Barista Board)
+          </h2>
+          <p class="text-xs text-stone-400">Theo dõi trạng thái chế biến theo thời gian thực (Real-time KDS)</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="loadKdsOrders()" class="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-lg text-xs font-semibold border border-stone-700">
+            <i class="fa-solid fa-arrows-rotate mr-1"></i> Làm mới
+          </button>
+        </div>
+      </div>
+
+      <!-- KDS Kanban Columns -->
+      <div class="flex-1 grid grid-cols-3 gap-4 overflow-hidden">
+        <!-- PENDING COLUMN -->
+        <div class="bg-stone-950/70 rounded-2xl border border-stone-800 flex flex-col overflow-hidden">
+          <div class="p-3.5 bg-amber-500/10 border-b border-amber-500/20 flex items-center justify-between">
+            <span class="text-xs font-bold text-amber-400 flex items-center gap-2">
+              <i class="fa-regular fa-clock"></i> 1. CHỜ PHA CHẾ (PENDING)
+            </span>
+            <span id="kds-count-pending" class="bg-amber-500/20 text-amber-300 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+          </div>
+          <div id="kds-list-pending" class="flex-1 overflow-y-auto p-3 space-y-3">
+            <!-- Cards rendered here -->
+          </div>
+        </div>
+
+        <!-- PREPARING COLUMN -->
+        <div class="bg-stone-950/70 rounded-2xl border border-stone-800 flex flex-col overflow-hidden">
+          <div class="p-3.5 bg-sky-500/10 border-b border-sky-500/20 flex items-center justify-between">
+            <span class="text-xs font-bold text-sky-400 flex items-center gap-2">
+              <i class="fa-solid fa-blender"></i> 2. ĐANG PHA CHẾ (PREPARING)
+            </span>
+            <span id="kds-count-preparing" class="bg-sky-500/20 text-sky-300 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+          </div>
+          <div id="kds-list-preparing" class="flex-1 overflow-y-auto p-3 space-y-3">
+            <!-- Cards rendered here -->
+          </div>
+        </div>
+
+        <!-- READY COLUMN -->
+        <div class="bg-stone-950/70 rounded-2xl border border-stone-800 flex flex-col overflow-hidden">
+          <div class="p-3.5 bg-emerald-500/10 border-b border-emerald-500/20 flex items-center justify-between">
+            <span class="text-xs font-bold text-emerald-400 flex items-center gap-2">
+              <i class="fa-solid fa-circle-check"></i> 3. SẴN SÀNG GIAO (READY)
+            </span>
+            <span id="kds-count-ready" class="bg-emerald-500/20 text-emerald-300 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+          </div>
+          <div id="kds-list-ready" class="flex-1 overflow-y-auto p-3 space-y-3">
+            <!-- Cards rendered here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- VIEW 3: INVENTORY (KHO NGUYÊN LIỆU)        -->
+    <!-- ========================================== -->
+    <div id="view-inventory" class="view-panel flex-1 flex flex-col p-6 overflow-hidden bg-stone-50 hidden">
+      <div class="flex items-center justify-between mb-5">
+        <div>
+          <h2 class="text-xl font-bold text-stone-900 flex items-center gap-2">
+            <i class="fa-solid fa-warehouse text-brand-600"></i> Quản Lý Tồn Kho & Nhật Ký Biến Động
+          </h2>
+          <p class="text-xs text-stone-500">Giám sát định mức nguyên liệu tiêu hao, cảnh báo hết hàng và lịch sử xuất nhập kho</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="openRestockModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 flex items-center gap-2">
+            <i class="fa-solid fa-plus"></i> Nhập Kho Thêm (Restock)
+          </button>
+          <button onclick="loadInventoryData()" class="px-3.5 py-2 bg-white border border-stone-300 hover:bg-stone-100 text-stone-700 rounded-xl text-xs font-semibold">
+            <i class="fa-solid fa-arrows-rotate"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- INVENTORY SUB TABS -->
+      <div class="flex gap-2 border-b border-stone-200 mb-4 pb-2">
+        <button onclick="switchInventorySubTab('stocks')" id="subtab-stocks-btn" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-brand-600 text-white">
+          Tồn Kho Hiện Tại
+        </button>
+        <button onclick="switchInventorySubTab('movements')" id="subtab-movements-btn" class="px-4 py-1.5 rounded-lg text-xs font-semibold text-stone-600 hover:bg-stone-200">
+          Nhật Ký Biến Động (Stock Movements)
+        </button>
+      </div>
+
+      <!-- INVENTORY LIST TABLE -->
+      <div id="inventory-stocks-container" class="flex-1 overflow-y-auto bg-white rounded-2xl shadow-sm border border-stone-200">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-stone-100/70 border-b border-stone-200 text-stone-600 uppercase font-semibold">
+            <tr>
+              <th class="p-3.5">ID</th>
+              <th class="p-3.5">Tên Nguyên Liệu</th>
+              <th class="p-3.5">Tồn Kho Hiện Tại</th>
+              <th class="p-3.5">Đơn Vị Tính</th>
+              <th class="p-3.5">Ngưỡng Báo Hết</th>
+              <th class="p-3.5">Trạng Thái</th>
+              <th class="p-3.5 text-right">Thao Tác</th>
+            </tr>
+          </thead>
+          <tbody id="ingredients-table-body" class="divide-y divide-stone-100">
+            <!-- Rendered dynamically -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- STOCK MOVEMENTS TABLE -->
+      <div id="inventory-movements-container" class="flex-1 overflow-y-auto bg-white rounded-2xl shadow-sm border border-stone-200 hidden">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-stone-100/70 border-b border-stone-200 text-stone-600 uppercase font-semibold">
+            <tr>
+              <th class="p-3.5">Thời Gian</th>
+              <th class="p-3.5">Loại Biến Động</th>
+              <th class="p-3.5">Nguyên Liệu</th>
+              <th class="p-3.5">Lượng Đổi (+/-)</th>
+              <th class="p-3.5">Tồn Trước</th>
+              <th class="p-3.5">Tồn Sau</th>
+              <th class="p-3.5">Mã Tham Chiếu / Đơn</th>
+              <th class="p-3.5">Ghi Chú</th>
+            </tr>
+          </thead>
+          <tbody id="movements-table-body" class="divide-y divide-stone-100">
+            <!-- Rendered dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- VIEW 4: SHIFT & CA LÀM VIỆC                -->
+    <!-- ========================================== -->
+    <div id="view-shift" class="view-panel flex-1 flex flex-col p-6 overflow-y-auto bg-stone-50 hidden">
+      <div class="max-w-4xl mx-auto w-full space-y-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-xl font-bold text-stone-900 flex items-center gap-2">
+              <i class="fa-solid fa-calculator text-brand-600"></i> Ca Làm Việc & Đối Soát Két Tiền
+            </h2>
+            <p class="text-xs text-stone-500">Kiểm soát dòng tiền mặt, doanh thu chuyển khoản và chênh lệch két</p>
+          </div>
+          <button onclick="loadShiftSummary()" class="px-3.5 py-2 bg-white border border-stone-300 hover:bg-stone-100 text-stone-700 rounded-xl text-xs font-semibold">
+            <i class="fa-solid fa-arrows-rotate mr-1"></i> Cập nhật số liệu
+          </button>
+        </div>
+
+        <!-- Shift Active Card -->
+        <div id="shift-details-card" class="bg-white rounded-2xl p-6 shadow-sm border border-stone-200 space-y-6">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+
+  <!-- ========================================== -->
+  <!-- MODAL: CHỌN TOPPING & TÙY CHỌN MÓN         -->
+  <!-- ========================================== -->
+  <div id="modal-topping" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full mx-4 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="p-4 bg-brand-50 border-b border-brand-100 flex items-center justify-between">
+        <div>
+          <h3 id="modal-product-name" class="font-bold text-stone-900 text-base">Tên Món</h3>
+          <p id="modal-product-price" class="text-xs font-semibold text-brand-600">0 đ</p>
+        </div>
+        <button onclick="closeToppingModal()" class="w-8 h-8 rounded-full bg-stone-200 hover:bg-stone-300 text-stone-600 flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-5 flex-1 overflow-y-auto space-y-4">
+        <!-- Toppings Options -->
+        <div>
+          <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">Thêm Topping / Size</label>
+          <div id="modal-addon-list" class="space-y-2">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- Cup Notes -->
+        <div>
+          <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">Ghi Chú Ly Này</label>
+          <input type="text" id="modal-item-notes" placeholder="VD: 50% đường, nhiều đá, uống nóng..." 
+                 class="w-full text-xs px-3 py-2.5 border border-stone-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none">
+        </div>
+
+        <!-- Quantity selector -->
+        <div class="flex items-center justify-between pt-2 border-t border-stone-100">
+          <span class="text-xs font-bold text-stone-700">Số lượng:</span>
+          <div class="flex items-center space-x-3">
+            <button onclick="changeModalQty(-1)" class="w-8 h-8 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold flex items-center justify-center">-</button>
+            <span id="modal-qty" class="font-bold text-stone-900 text-sm">1</span>
+            <button onclick="changeModalQty(1)" class="w-8 h-8 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold flex items-center justify-center">+</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 bg-stone-50 border-t border-stone-200 flex items-center justify-between">
+        <div>
+          <p class="text-xs text-stone-500">Tổng món:</p>
+          <p id="modal-total-price" class="text-base font-bold text-brand-600">0 đ</p>
+        </div>
+        <button onclick="confirmAddToOrder()" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-xs shadow-md shadow-brand-500/20">
+          <i class="fa-solid fa-cart-plus mr-1"></i> Thêm Vào Giỏ
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========================================== -->
+  <!-- MODAL: NHẬP KHO (RESTOCK INGREDIENT)       -->
+  <!-- ========================================== -->
+  <div id="modal-restock" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full mx-4 shadow-2xl p-5 space-y-4">
+      <div class="flex items-center justify-between border-b border-stone-200 pb-3">
+        <h3 class="font-bold text-stone-900 text-base flex items-center gap-2">
+          <i class="fa-solid fa-dolly text-emerald-600"></i> Nhập Thêm Nguyên Liệu
+        </h3>
+        <button onclick="closeRestockModal()" class="w-7 h-7 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-500 flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold text-stone-700 mb-1">Chọn nguyên liệu:</label>
+          <select id="restock-ingredient-select" class="w-full p-2.5 border border-stone-300 rounded-xl bg-white font-medium focus:ring-1 focus:ring-emerald-500">
+            <!-- Rendered dynamically -->
+          </select>
+        </div>
+        <div>
+          <label class="block font-semibold text-stone-700 mb-1">Số lượng nhập thêm:</label>
+          <input type="number" id="restock-qty" placeholder="VD: 1000" min="1" step="any"
+                 class="w-full p-2.5 border border-stone-300 rounded-xl font-medium focus:ring-1 focus:ring-emerald-500">
+        </div>
+        <div>
+          <label class="block font-semibold text-stone-700 mb-1">Mã chứng từ / Phiếu nhập:</label>
+          <input type="text" id="restock-ref" placeholder="VD: PO-2026-001" 
+                 class="w-full p-2.5 border border-stone-300 rounded-xl font-medium focus:ring-1 focus:ring-emerald-500">
+        </div>
+        <div>
+          <label class="block font-semibold text-stone-700 mb-1">Ghi chú nhập hàng:</label>
+          <input type="text" id="restock-notes" placeholder="VD: Nhập thêm hạt Robusta từ Buôn Ma Thuột..." 
+                 class="w-full p-2.5 border border-stone-300 rounded-xl font-medium focus:ring-1 focus:ring-emerald-500">
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-stone-100 flex justify-end gap-2">
+        <button onclick="closeRestockModal()" class="px-4 py-2 border border-stone-300 rounded-xl text-xs font-semibold text-stone-600 hover:bg-stone-50">
+          Hủy bỏ
+        </button>
+        <button onclick="submitRestock()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20">
+          Xác Nhận Nhập Kho
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========================================== -->
+  <!-- MODAL: MỞ CA LÀM VIỆC                       -->
+  <!-- ========================================== -->
+  <div id="modal-open-shift" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full mx-4 shadow-2xl p-5 space-y-4">
+      <div class="flex items-center justify-between border-b border-stone-200 pb-3">
+        <h3 class="font-bold text-stone-900 text-base flex items-center gap-2">
+          <i class="fa-solid fa-door-open text-brand-600"></i> Bắt Đầu Ca Làm Việc Mới
+        </h3>
+        <button onclick="closeOpenShiftModal()" class="w-7 h-7 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-500 flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold text-stone-700 mb-1">Tên thu ngân nhận ca:</label>
+          <input type="text" id="open-shift-cashier" placeholder="VD: Nguyễn Văn A..." 
+                 class="w-full p-2.5 border border-stone-300 rounded-xl font-medium focus:ring-1 focus:ring-brand-500">
+        </div>
+        <div>
+          <label class="block font-semibold text-stone-700 mb-1">Tiền mặt đầu ca trong két (VND):</label>
+          <input type="number" id="open-shift-cash" placeholder="VD: 1500000" min="0" step="10000"
+                 class="w-full p-2.5 border border-stone-300 rounded-xl font-medium focus:ring-1 focus:ring-brand-500">
+        </div>
+        <div>
+          <label class="block font-semibold text-stone-700 mb-1">Ghi chú đầu ca:</label>
+          <input type="text" id="open-shift-notes" placeholder="VD: Ca sáng 6h-14h, két đầy đủ tiền lẻ..." 
+                 class="w-full p-2.5 border border-stone-300 rounded-xl font-medium focus:ring-1 focus:ring-brand-500">
+        </div>
+      </div>
+      <div class="pt-3 border-t border-stone-100 flex justify-end gap-2">
+        <button onclick="closeOpenShiftModal()" class="px-4 py-2 border border-stone-300 rounded-xl text-xs font-semibold text-stone-600 hover:bg-stone-50">
+          Đóng
+        </button>
+        <button onclick="submitOpenShift()" class="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow-md shadow-brand-500/20">
+          Mở Ca Làm Việc
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========================================== -->
+  <!-- MODAL: CHỐT CA VÀ ĐỐI SOÁT                 -->
+  <!-- ========================================== -->
+  <div id="modal-close-shift" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full mx-4 shadow-2xl p-5 space-y-4">
+      <div class="flex items-center justify-between border-b border-stone-200 pb-3">
+        <h3 class="font-bold text-stone-900 text-base flex items-center gap-2">
+          <i class="fa-solid fa-lock text-rose-600"></i> Chốt Ca & Đối Soát Tiền Mặt
+        </h3>
+        <button onclick="closeCloseShiftModal()" class="w-7 h-7 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-500 flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="space-y-3 text-xs">
+        <div class="p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-1">
+          <p class="text-stone-500">Tiền mặt dự kiến có trong két:</p>
+          <p id="modal-close-expected" class="text-base font-bold text-stone-900">0 đ</p>
+        </div>
+        <div>
+          <label class="block font-semibold text-stone-700 mb-1">Số tiền mặt thực đếm trong két (VND):</label>
+          <input type="number" id="close-shift-cash" oninput="calculateDiscrepancyPreview()" placeholder="VD: 1650000" min="0" step="1000"
+                 class="w-full p-2.5 border border-stone-300 rounded-xl font-medium focus:ring-1 focus:ring-rose-500">
+        </div>
+        <div id="discrepancy-preview" class="hidden p-2.5 rounded-lg text-xs font-semibold">
+          <!-- Live Preview -->
+        </div>
+        <div>
+          <label class="block font-semibold text-stone-700 mb-1">Ghi chú bàn giao ca:</label>
+          <input type="text" id="close-shift-notes" placeholder="VD: Két tiền đã bàn giao cho ca chiều..." 
+                 class="w-full p-2.5 border border-stone-300 rounded-xl font-medium focus:ring-1 focus:ring-rose-500">
+        </div>
+      </div>
+      <div class="pt-3 border-t border-stone-100 flex justify-end gap-2">
+        <button onclick="closeCloseShiftModal()" class="px-4 py-2 border border-stone-300 rounded-xl text-xs font-semibold text-stone-600 hover:bg-stone-50">
+          Hủy bỏ
+        </button>
+        <button onclick="submitCloseShift()" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-600/20">
+          Xác Nhận Chốt Ca
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+
+  <!-- ========================================== -->
+  <!-- FRONTEND LOGIC (ES6 + GRAPHQL CLIENT)      -->
+  <!-- ========================================== -->
+  <script>
+    // Global State
+    let categories = [];
+    let products = [];
+    let addons = [];
+    let ingredients = [];
+    let activeShift = null;
+    let selectedCategory = null;
+    let cart = [];
+    let isTakeaway = false;
+    let paymentMethod = 'CASH';
+
+    // Temp state for Topping Modal
+    let modalProduct = null;
+    let modalSelectedAddons = [];
+    let modalQuantity = 1;
+
+    // GRAPHQL FETCH HELPER
+    async function gql(query, variables = {}) {
+      try {
+        const response = await fetch('/graphql/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({ query, variables })
+        });
+        const res = await response.json();
+        if (res.errors && res.errors.length > 0) {
+          throw new Error(res.errors[0].message);
+        }
+        return res.data;
+      } catch (err) {
+        showToast(err.message, 'error');
+        throw err;
+      }
+    }
+
+    // FORMAT CURRENCY
+    function formatMoney(amount) {
+      if (!amount) return '0 đ';
+      return Number(amount).toLocaleString('vi-VN') + ' đ';
+    }
+
+    // TOAST SYSTEM
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `p-3.5 rounded-xl shadow-xl text-xs font-semibold flex items-center gap-2.5 text-white pointer-events-auto transform transition duration-300 translate-y-2 opacity-0 ${
+        type === 'error' ? 'bg-rose-600 shadow-rose-600/30' : 
+        type === 'warning' ? 'bg-amber-600 shadow-amber-600/30' : 
+        'bg-emerald-600 shadow-emerald-600/30'
+      }`;
+      const icon = type === 'error' ? 'fa-circle-exclamation' : type === 'warning' ? 'fa-triangle-exclamation' : 'fa-circle-check';
+      toast.innerHTML = `<i class="fa-solid ${icon} text-sm"></i> <span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => { toast.classList.remove('translate-y-2', 'opacity-0'); }, 10);
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    // TAB NAVIGATION
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-brand-600', 'text-white', 'shadow-sm');
+        btn.classList.add('text-stone-400');
+      });
+      document.querySelectorAll('.view-panel').forEach(panel => panel.classList.add('hidden'));
+
+      const activeBtn = document.getElementById(`tab-btn-${tab}`);
+      if (activeBtn) {
+        activeBtn.classList.add('bg-brand-600', 'text-white', 'shadow-sm');
+        activeBtn.classList.remove('text-stone-400');
+      }
+      const activePanel = document.getElementById(`view-${tab}`);
+      if (activePanel) activePanel.classList.remove('hidden');
+
+      if (tab === 'kds') loadKdsOrders();
+      if (tab === 'inventory') loadInventoryData();
+      if (tab === 'shift') loadShiftSummary();
+    }
+
+    // --- 1. INITIAL DATA FETCH ---
+    async function loadInitialData() {
+      try {
+        const query = `
+          query {
+            activeShift {
+              id
+              cashierName
+              status
+              openingCash
+              cashSales
+              transferSales
+              totalSales
+              expectedCash
+            }
+            categories {
+              id
+              name
+            }
+            products {
+              id
+              name
+              basePrice
+              description
+              isAvailable
+              category {
+                id
+                name
+              }
+              recipes {
+                ingredient {
+                  name
+                  unit
+                }
+                quantityNeeded
+              }
+            }
+            addons(isAvailable: true) {
+              id
+              name
+              extraPrice
+            }
+            ingredients {
+              id
+              name
+              currentQuantity
+              unit
+              reorderLevel
+              isLowStock
+            }
+          }
+        `;
+        const data = await gql(query);
+        activeShift = data.activeShift;
+        categories = data.categories || [];
+        products = data.products || [];
+        addons = data.addons || [];
+        ingredients = data.ingredients || [];
+
+        renderShiftChip();
+        renderCategories();
+        renderProducts();
+        checkLowStockAlerts();
+      } catch (err) {
+        console.error('Lỗi nạp dữ liệu ban đầu:', err);
+      }
+    }
+
+    // RENDER SHIFT CHIP
+    function renderShiftChip() {
+      const chipLabel = document.getElementById('shift-cashier-label');
+      if (activeShift && activeShift.status === 'OPEN') {
+        chipLabel.innerHTML = `<span class="text-stone-400 font-normal">Ca #${activeShift.id}:</span> <span class="font-bold text-white">${activeShift.cashierName}</span> (${formatMoney(activeShift.openingCash)})`;
+      } else {
+        chipLabel.innerHTML = `<span class="text-rose-400 font-bold">Chưa mở ca</span> - Nhấn để mở ca`;
+      }
+    }
+
+    function quickShiftAction() {
+      if (activeShift && activeShift.status === 'OPEN') {
+        openCloseShiftModal();
+      } else {
+        openOpenShiftModal();
+      }
+    }
+
+    // RENDER CATEGORIES
+    function renderCategories() {
+      const container = document.getElementById('category-tabs');
+      container.innerHTML = `
+        <button onclick="filterCategory(null)" class="cat-pill ${selectedCategory === null ? 'active bg-brand-600 text-white' : 'bg-white text-stone-700 border border-stone-200'} px-4 py-2 rounded-full text-xs font-semibold shadow-sm shrink-0 transition">
+          Tất cả (${products.length})
+        </button>
+      `;
+      categories.forEach(cat => {
+        const count = products.filter(p => p.category && p.category.id === cat.id).length;
+        const btn = document.createElement('button');
+        btn.onclick = () => filterCategory(cat.id);
+        btn.className = `cat-pill ${selectedCategory === cat.id ? 'active bg-brand-600 text-white' : 'bg-white text-stone-700 border border-stone-200'} px-4 py-2 rounded-full text-xs font-semibold shadow-sm shrink-0 transition`;
+        btn.innerText = `${cat.name} (${count})`;
+        container.appendChild(btn);
+      });
+    }
+
+    function filterCategory(catId) {
+      selectedCategory = catId;
+      renderCategories();
+      renderProducts();
+    }
+
+    function handleSearch(term) {
+      renderProducts(term.trim().toLowerCase());
+    }
+
+    // RENDER PRODUCTS GRID
+    function renderProducts(searchTerm = '') {
+      const grid = document.getElementById('products-grid');
+      grid.innerHTML = '';
+
+      let filtered = products;
+      if (selectedCategory !== null) {
+        filtered = filtered.filter(p => p.category && p.category.id === selectedCategory);
+      }
+      if (searchTerm) {
+        filtered = filtered.filter(p => p.name.toLowerCase().includes(searchTerm) || (p.description && p.description.toLowerCase().includes(searchTerm)));
+      }
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full h-48 flex flex-col items-center justify-center text-stone-400">
+            <i class="fa-solid fa-magnifying-glass text-3xl mb-2 text-stone-300"></i>
+            <p class="text-xs">Không tìm thấy món phù hợp</p>
+          </div>
+        `;
+        return;
+      }
+
+      filtered.forEach(p => {
+        const card = document.createElement('div');
+        card.className = `bg-white rounded-2xl p-4 shadow-sm border border-stone-200/80 hover:shadow-md transition flex flex-col justify-between group ${p.isAvailable ? 'cursor-pointer hover:border-brand-500' : 'opacity-60 cursor-not-allowed'}`;
+        card.onclick = () => {
+          if (p.isAvailable) openToppingModal(p);
+          else showToast(`Món '${p.name}' đang tạm ngừng bán`, 'warning');
+        };
+
+        const recipesInfo = p.recipes && p.recipes.length > 0 
+          ? p.recipes.map(r => `${r.quantityNeeded}${r.ingredient.unit} ${r.ingredient.name}`).join(', ')
+          : 'Chưa gán công thức';
+
+        card.innerHTML = `
+          <div>
+            <div class="flex items-start justify-between gap-2 mb-2">
+              <span class="text-xs font-semibold text-brand-700 bg-brand-50 px-2.5 py-0.5 rounded-full border border-brand-200">
+                ${p.category ? p.category.name : 'Đồ uống'}
+              </span>
+              ${p.isAvailable ? '<span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">Còn bán</span>' : '<span class="text-[10px] bg-stone-200 text-stone-600 px-1.5 py-0.5 rounded font-bold">Hết hàng</span>'}
+            </div>
+            <h4 class="font-bold text-stone-900 text-sm group-hover:text-brand-600 transition line-clamp-1">${p.name}</h4>
+            <p class="text-[11px] text-stone-500 line-clamp-2 mt-1">${p.description || 'Hương vị thơm ngon pha chế tại chỗ'}</p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between">
+            <span class="font-bold text-sm text-stone-900">${formatMoney(p.basePrice)}</span>
+            <div class="w-8 h-8 rounded-lg bg-brand-50 group-hover:bg-brand-600 text-brand-600 group-hover:text-white flex items-center justify-center transition shadow-sm">
+              <i class="fa-solid fa-plus text-xs"></i>
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    // --- 2. MODAL TOPPING & ADD TO CART ---
+    function openToppingModal(product) {
+      modalProduct = product;
+      modalSelectedAddons = [];
+      modalQuantity = 1;
+
+      document.getElementById('modal-product-name').innerText = product.name;
+      document.getElementById('modal-product-price').innerText = formatMoney(product.basePrice);
+      document.getElementById('modal-item-notes').value = '';
+      document.getElementById('modal-qty').innerText = '1';
+
+      const addonList = document.getElementById('modal-addon-list');
+      addonList.innerHTML = '';
+      addons.forEach(addon => {
+        const item = document.createElement('label');
+        item.className = 'flex items-center justify-between p-2.5 rounded-xl border border-stone-200 hover:bg-stone-50 cursor-pointer text-xs';
+        item.innerHTML = `
+          <div class="flex items-center gap-2.5">
+            <input type="checkbox" value="${addon.id}" onchange="toggleModalAddon(${addon.id})" class="w-4 h-4 text-brand-600 rounded border-stone-300 focus:ring-brand-500">
+            <span class="font-medium text-stone-800">${addon.name}</span>
+          </div>
+          <span class="font-bold text-stone-700">+${formatMoney(addon.extraPrice)}</span>
+        `;
+        addonList.appendChild(item);
+      });
+
+      updateModalTotalPrice();
+      document.getElementById('modal-topping').classList.remove('hidden');
+    }
+
+    function closeToppingModal() {
+      document.getElementById('modal-topping').classList.add('hidden');
+      modalProduct = null;
+    }
+
+    function toggleModalAddon(addonId) {
+      const idx = modalSelectedAddons.indexOf(addonId);
+      if (idx > -1) modalSelectedAddons.splice(idx, 1);
+      else modalSelectedAddons.push(addonId);
+      updateModalTotalPrice();
+    }
+
+    function changeModalQty(delta) {
+      modalQuantity = Math.max(1, modalQuantity + delta);
+      document.getElementById('modal-qty').innerText = modalQuantity;
+      updateModalTotalPrice();
+    }
+
+    function updateModalTotalPrice() {
+      if (!modalProduct) return;
+      let unitPrice = Number(modalProduct.basePrice);
+      modalSelectedAddons.forEach(aid => {
+        const a = addons.find(x => x.id === aid);
+        if (a) unitPrice += Number(a.extraPrice);
+      });
+      const total = unitPrice * modalQuantity;
+      document.getElementById('modal-total-price').innerText = formatMoney(total);
+    }
+
+    function confirmAddToOrder() {
+      if (!modalProduct) return;
+      const notes = document.getElementById('modal-item-notes').value.trim();
+      const selectedAddonObjects = modalSelectedAddons.map(aid => addons.find(x => x.id === aid)).filter(Boolean);
+
+      let unitPrice = Number(modalProduct.basePrice);
+      selectedAddonObjects.forEach(a => unitPrice += Number(a.extraPrice));
+
+      cart.push({
+        product: modalProduct,
+        quantity: modalQuantity,
+        notes: notes,
+        addons: selectedAddonObjects,
+        addonIds: modalSelectedAddons.slice(),
+        unitPrice: unitPrice,
+        subtotal: unitPrice * modalQuantity,
+      });
+
+      closeToppingModal();
+      renderCart();
+      showToast(`Đã thêm ${modalQuantity}x ${modalProduct.name} vào giỏ`, 'success');
+    }
+
+    // --- 3. CART SYSTEM ---
+    function setTakeaway(val) {
+      isTakeaway = val;
+      const btnDinein = document.getElementById('btn-dinein');
+      const btnTakeaway = document.getElementById('btn-takeaway');
+      const tableWrapper = document.getElementById('table-number-wrapper');
+
+      if (isTakeaway) {
+        btnTakeaway.className = 'flex-1 py-1.5 rounded-md font-semibold transition bg-brand-600 text-white text-center';
+        btnDinein.className = 'flex-1 py-1.5 rounded-md font-semibold transition text-stone-600 text-center';
+        tableWrapper.classList.add('opacity-40');
+      } else {
+        btnDinein.className = 'flex-1 py-1.5 rounded-md font-semibold transition bg-brand-600 text-white text-center';
+        btnTakeaway.className = 'flex-1 py-1.5 rounded-md font-semibold transition text-stone-600 text-center';
+        tableWrapper.classList.remove('opacity-40');
+      }
+    }
+
+    function setPaymentMethod(method) {
+      paymentMethod = method;
+      const btnCash = document.getElementById('btn-pay-cash');
+      const btnTransfer = document.getElementById('btn-pay-transfer');
+
+      if (method === 'CASH') {
+        btnCash.className = 'py-2 px-3 rounded-lg border font-semibold flex items-center justify-center gap-2 border-brand-500 bg-brand-50 text-brand-800';
+        btnTransfer.className = 'py-2 px-3 rounded-lg border font-semibold flex items-center justify-center gap-2 border-stone-300 text-stone-700 bg-white hover:bg-stone-50';
+      } else {
+        btnTransfer.className = 'py-2 px-3 rounded-lg border font-semibold flex items-center justify-center gap-2 border-brand-500 bg-brand-50 text-brand-800';
+        btnCash.className = 'py-2 px-3 rounded-lg border font-semibold flex items-center justify-center gap-2 border-stone-300 text-stone-700 bg-white hover:bg-stone-50';
+      }
+    }
+
+    function renderCart() {
+      const container = document.getElementById('cart-items-list');
+      const badge = document.getElementById('cart-count-badge');
+      badge.innerText = cart.length;
+
+      if (cart.length === 0) {
+        container.innerHTML = `
+          <div class="h-full flex flex-col items-center justify-center text-stone-400 text-center p-6">
+            <i class="fa-solid fa-mug-saucer text-4xl mb-3 text-stone-300"></i>
+            <p class="text-sm font-medium">Chưa có món nào được chọn</p>
+            <p class="text-xs text-stone-400 mt-1">Bấm vào các món bên trái để bắt đầu thêm vào đơn</p>
+          </div>
+        `;
+        updateCartTotals();
+        return;
+      }
+
+      container.innerHTML = '';
+      cart.forEach((item, index) => {
+        const itemEl = document.createElement('div');
+        itemEl.className = 'p-3 bg-stone-50 rounded-xl border border-stone-200/80 text-xs space-y-1.5';
+        
+        const addonsText = item.addons.length > 0 
+          ? `<p class="text-[11px] text-stone-500"><i class="fa-solid fa-plus text-[9px] text-brand-600 mr-1"></i>${item.addons.map(a => `${a.name} (+${formatMoney(a.extraPrice)})`).join(', ')}</p>` 
+          : '';
+        const notesText = item.notes 
+          ? `<p class="text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60 inline-block font-medium">Ghi chú: ${item.notes}</p>` 
+          : '';
+
+        itemEl.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex-1">
+              <h5 class="font-bold text-stone-900">${item.product.name}</h5>
+              ${addonsText}
+              ${notesText}
+            </div>
+            <button onclick="removeCartItem(${index})" class="text-stone-400 hover:text-rose-600 transition">
+              <i class="fa-regular fa-trash-can"></i>
+            </button>
+          </div>
+          <div class="flex items-center justify-between pt-1">
+            <span class="font-bold text-brand-700">${formatMoney(item.subtotal)}</span>
+            <div class="flex items-center space-x-2">
+              <button onclick="changeCartItemQty(${index}, -1)" class="w-6 h-6 rounded bg-white border border-stone-300 hover:bg-stone-100 flex items-center justify-center font-bold text-stone-700">-</button>
+              <span class="font-bold text-stone-900 px-1">${item.quantity}</span>
+              <button onclick="changeCartItemQty(${index}, 1)" class="w-6 h-6 rounded bg-white border border-stone-300 hover:bg-stone-100 flex items-center justify-center font-bold text-stone-700">+</button>
+            </div>
+          </div>
+        `;
+        container.appendChild(itemEl);
+      });
+
+      updateCartTotals();
+    }
+
+    function changeCartItemQty(index, delta) {
+      if (!cart[index]) return;
+      cart[index].quantity += delta;
+      if (cart[index].quantity <= 0) {
+        cart.splice(index, 1);
+      } else {
+        cart[index].subtotal = cart[index].unitPrice * cart[index].quantity;
+      }
+      renderCart();
+    }
+
+    function removeCartItem(index) {
+      cart.splice(index, 1);
+      renderCart();
+    }
+
+    function clearCart() {
+      cart = [];
+      renderCart();
+    }
+
+    function updateCartTotals() {
+      const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
+      const discountInput = Number(document.getElementById('cart-discount').value) || 0;
+      const total = Math.max(0, subtotal - discountInput);
+
+      document.getElementById('cart-subtotal').innerText = formatMoney(subtotal);
+      document.getElementById('cart-total').innerText = formatMoney(total);
+    }
+
+    // --- 4. SUBMIT ORDER VIA GRAPHQL ---
+    async function submitOrder() {
+      if (cart.length === 0) {
+        showToast('Giỏ hàng đang trống! Vui lòng chọn ít nhất 1 món.', 'warning');
+        return;
+      }
+      if (!activeShift || activeShift.status !== 'OPEN') {
+        showToast('Chưa mở ca làm việc! Vui lòng mở ca trước khi tạo đơn.', 'error');
+        openOpenShiftModal();
+        return;
+      }
+
+      const tableNumber = document.getElementById('cart-table-number').value.trim();
+      const discountAmount = Number(document.getElementById('cart-discount').value) || 0;
+      const orderNote = document.getElementById('cart-order-note').value.trim();
+
+      const itemsInput = cart.map(item => ({
+        productId: Number(item.product.id),
+        quantity: Number(item.quantity),
+        notes: item.notes || '',
+        addonIds: item.addonIds.map(Number),
+      }));
+
+      const mutation = `
+        mutation CreateNewOrder($input: OrderInput!) {
+          createOrder(input: $input) {
+            id
+            orderCode
+            totalAmount
+            status
+            tableNumber
+            paymentMethod
+          }
+        }
+      `;
+
+      const variables = {
+        input: {
+          items: itemsInput,
+          tableNumber: tableNumber,
+          isTakeaway: isTakeaway,
+          paymentMethod: paymentMethod,
+          discountAmount: discountAmount.toString(),
+          note: orderNote,
+        }
+      };
+
+      const btn = document.getElementById('btn-submit-order');
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i> Đang xử lý trừ kho & tạo đơn...`;
+
+      try {
+        const data = await gql(mutation, variables);
+        const order = data.createOrder;
+        showToast(`Đã tạo đơn #${order.orderCode} thành công! Đã trừ kho tự động.`, 'success');
+        clearCart();
+        document.getElementById('cart-table-number').value = '';
+        document.getElementById('cart-order-note').value = '';
+        document.getElementById('cart-discount').value = '0';
+        // Refresh shift and inventory
+        loadInitialData();
+      } catch (err) {
+        // Error toast already displayed in gql()
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-check mr-1"></i> Đặt Món & Trừ Kho Tự Động`;
+      }
+    }
+
+    // --- 5. BARISTA KDS FUNCTIONS ---
+    async function loadKdsOrders() {
+      try {
+        const query = `
+          query {
+            orders {
+              id
+              orderCode
+              status
+              tableNumber
+              isTakeaway
+              totalAmount
+              paymentMethod
+              note
+              createdAt
+              items {
+                id
+                productName
+                quantity
+                notes
+                addons {
+                  addonName
+                }
+              }
+            }
+          }
+        `;
+        const data = await gql(query);
+        const allOrders = data.orders || [];
+
+        const pending = allOrders.filter(o => o.status === 'PENDING');
+        const preparing = allOrders.filter(o => o.status === 'PREPARING');
+        const ready = allOrders.filter(o => o.status === 'READY');
+
+        document.getElementById('kds-count-pending').innerText = pending.length;
+        document.getElementById('kds-count-preparing').innerText = preparing.length;
+        document.getElementById('kds-count-ready').innerText = ready.length;
+        document.getElementById('pending-badge').innerText = pending.length;
+        document.getElementById('pending-badge').classList.toggle('hidden', pending.length === 0);
+
+        renderKdsColumn('kds-list-pending', pending, 'PENDING');
+        renderKdsColumn('kds-list-preparing', preparing, 'PREPARING');
+        renderKdsColumn('kds-list-ready', ready, 'READY');
+      } catch (err) {
+        console.error('Lỗi nạp KDS orders:', err);
+      }
+    }
+
+    function renderKdsColumn(containerId, orders, currentStatus) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+
+      if (orders.length === 0) {
+        container.innerHTML = `<div class="p-8 text-center text-stone-600 text-xs">Không có đơn hàng nào</div>`;
+        return;
+      }
+
+      orders.forEach(order => {
+        const card = document.createElement('div');
+        card.className = 'bg-stone-900 rounded-xl p-3.5 border border-stone-800 shadow-lg text-xs space-y-2.5 text-stone-200';
+
+        const itemsList = order.items.map(it => {
+          const addons = it.addons && it.addons.length > 0 ? `<span class="text-stone-400 text-[11px] block">+ ${it.addons.map(a => a.addonName).join(', ')}</span>` : '';
+          const note = it.notes ? `<span class="text-amber-400 font-semibold text-[10px] bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-900 inline-block mt-0.5">${it.notes}</span>` : '';
+          return `
+            <li class="py-1 border-b border-stone-800/60 last:border-0">
+              <div class="flex justify-between font-bold text-stone-100">
+                <span>${it.quantity}x ${it.productName}</span>
+              </div>
+              ${addons}
+              ${note}
+            </li>
+          `;
+        }).join('');
+
+        let actionButton = '';
+        if (currentStatus === 'PENDING') {
+          actionButton = `
+            <button onclick="updateStatus(${order.id}, 'PREPARING')" class="flex-1 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-bold text-xs transition">
+              <i class="fa-solid fa-play mr-1"></i> Bắt đầu pha
+            </button>
+          `;
+        } else if (currentStatus === 'PREPARING') {
+          actionButton = `
+            <button onclick="updateStatus(${order.id}, 'READY')" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs transition">
+              <i class="fa-solid fa-check mr-1"></i> Đã pha xong
+            </button>
+          `;
+        } else if (currentStatus === 'READY') {
+          actionButton = `
+            <button onclick="updateStatus(${order.id}, 'COMPLETED')" class="flex-1 py-2 bg-stone-700 hover:bg-stone-600 text-white rounded-lg font-bold text-xs transition">
+              <i class="fa-solid fa-box mr-1"></i> Giao khách (Xong)
+            </button>
+          `;
+        }
+
+        const cancelButton = currentStatus !== 'COMPLETED' ? `
+          <button onclick="promptCancelOrder(${order.id}, '${order.orderCode}')" class="px-3 py-2 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-900/60 rounded-lg text-xs font-semibold">
+            <i class="fa-solid fa-ban"></i>
+          </button>
+        ` : '';
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between border-b border-stone-800 pb-2">
+            <div>
+              <span class="font-extrabold text-white text-sm tracking-wide">${order.orderCode}</span>
+              <span class="ml-2 text-[10px] ${order.isTakeaway ? 'bg-amber-900/50 text-amber-300 border border-amber-800' : 'bg-stone-800 text-stone-300'} px-2 py-0.5 rounded font-bold">
+                ${order.isTakeaway ? 'Mang đi' : (order.tableNumber || 'Tại quầy')}
+              </span>
+            </div>
+            <span class="text-[11px] text-stone-400 font-semibold">${formatMoney(order.totalAmount)}</span>
+          </div>
+
+          <ul class="space-y-1">
+            ${itemsList}
+          </ul>
+
+          ${order.note ? `<p class="text-[11px] text-stone-400 bg-stone-950 p-2 rounded border border-stone-800"><i class="fa-solid fa-quote-left text-brand-500 mr-1"></i>${order.note}</p>` : ''}
+
+          <div class="flex gap-2 pt-2 border-t border-stone-800/80">
+            ${actionButton}
+            ${cancelButton}
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    async function updateStatus(orderId, newStatus) {
+      try {
+        const mutation = `
+          mutation UpdateStatus($orderId: Int!, $newStatus: String!) {
+            updateOrderStatus(orderId: $orderId, newStatus: $newStatus) {
+              id
+              orderCode
+              status
+            }
+          }
+        `;
+        await gql(mutation, { orderId: Number(orderId), newStatus });
+        showToast(`Đã chuyển trạng thái đơn hàng sang ${newStatus}`, 'success');
+        loadKdsOrders();
+      } catch (err) {
+        // err toast already shown
+      }
+    }
+
+    async function promptCancelOrder(orderId, orderCode) {
+      if (confirm(`Bạn có chắc chắn muốn HỦY đơn hàng ${orderCode}? Hệ thống sẽ tự động HOÀN KHO toàn bộ nguyên liệu đã trừ.`)) {
+        try {
+          const mutation = `
+            mutation CancelOrder($orderId: Int!) {
+              updateOrderStatus(orderId: $orderId, newStatus: "CANCELLED", note: "Hủy bởi Barista / Thu ngân") {
+                id
+                orderCode
+                status
+              }
+            }
+          `;
+          await gql(mutation, { orderId: Number(orderId) });
+          showToast(`Đã HỦY đơn ${orderCode} và HOÀN KHO thành công!`, 'warning');
+          loadKdsOrders();
+        } catch (err) {}
+      }
+    }
+
+    // --- 6. INVENTORY & STOCK MANAGEMENT ---
+    async function loadInventoryData() {
+      try {
+        const query = `
+          query {
+            ingredients {
+              id
+              name
+              currentQuantity
+              unit
+              reorderLevel
+              isLowStock
+            }
+            stockMovements {
+              id
+              movementType
+              quantityChanged
+              quantityBefore
+              quantityAfter
+              referenceCode
+              notes
+              createdAt
+              ingredient {
+                name
+                unit
+              }
+            }
+          }
+        `;
+        const data = await gql(query);
+        ingredients = data.ingredients || [];
+        const movements = data.stockMovements || [];
+
+        renderIngredientsTable();
+        renderMovementsTable(movements);
+        checkLowStockAlerts();
+      } catch (err) {
+        console.error('Lỗi nạp tồn kho:', err);
+      }
+    }
+
+    function checkLowStockAlerts() {
+      const lowStockCount = ingredients.filter(i => i.isLowStock).length;
+      const badge = document.getElementById('low-stock-badge');
+      if (lowStockCount > 0) {
+        badge.innerText = `${lowStockCount}!`;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    function switchInventorySubTab(sub) {
+      const btnStocks = document.getElementById('subtab-stocks-btn');
+      const btnMovements = document.getElementById('subtab-movements-btn');
+      const containerStocks = document.getElementById('inventory-stocks-container');
+      const containerMovements = document.getElementById('inventory-movements-container');
+
+      if (sub === 'stocks') {
+        btnStocks.className = 'px-4 py-1.5 rounded-lg text-xs font-bold bg-brand-600 text-white';
+        btnMovements.className = 'px-4 py-1.5 rounded-lg text-xs font-semibold text-stone-600 hover:bg-stone-200';
+        containerStocks.classList.remove('hidden');
+        containerMovements.classList.add('hidden');
+      } else {
+        btnMovements.className = 'px-4 py-1.5 rounded-lg text-xs font-bold bg-brand-600 text-white';
+        btnStocks.className = 'px-4 py-1.5 rounded-lg text-xs font-semibold text-stone-600 hover:bg-stone-200';
+        containerMovements.classList.remove('hidden');
+        containerStocks.classList.add('hidden');
+      }
+    }
+
+    function renderIngredientsTable() {
+      const tbody = document.getElementById('ingredients-table-body');
+      tbody.innerHTML = '';
+      ingredients.forEach(ing => {
+        const tr = document.createElement('tr');
+        tr.className = `hover:bg-stone-50/80 transition ${ing.isLowStock ? 'bg-rose-50/50' : ''}`;
+        
+        const statusBadge = ing.isLowStock 
+          ? `<span class="bg-rose-100 text-rose-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-rose-200"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Sắp hết hàng</span>`
+          : `<span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200"><i class="fa-solid fa-check mr-1"></i>Đầy đủ</span>`;
+
+        tr.innerHTML = `
+          <td class="p-3.5 font-bold text-stone-500">#${ing.id}</td>
+          <td class="p-3.5 font-bold text-stone-900">${ing.name}</td>
+          <td class="p-3.5 font-bold text-sm ${ing.isLowStock ? 'text-rose-600' : 'text-stone-800'}">${Number(ing.currentQuantity).toLocaleString()}</td>
+          <td class="p-3.5 font-medium text-stone-600">${ing.unit}</td>
+          <td class="p-3.5 font-medium text-stone-500">${Number(ing.reorderLevel).toLocaleString()} ${ing.unit}</td>
+          <td class="p-3.5">${statusBadge}</td>
+          <td class="p-3.5 text-right">
+            <button onclick="openRestockFor(${ing.id})" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-bold text-[11px] border border-emerald-200">
+              <i class="fa-solid fa-plus mr-1"></i> Nhập kho
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderMovementsTable(movements) {
+      const tbody = document.getElementById('movements-table-body');
+      tbody.innerHTML = '';
+      movements.forEach(m => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-stone-50/80 transition';
+        
+        let typeBadge = '';
+        if (m.movementType === 'IMPORT') typeBadge = '<span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded">Nhập kho</span>';
+        else if (m.movementType === 'ORDER_DEDUCT') typeBadge = '<span class="bg-sky-100 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded">Trừ theo đơn</span>';
+        else if (m.movementType === 'ORDER_REFUND') typeBadge = '<span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded">Hoàn khi hủy</span>';
+        else typeBadge = '<span class="bg-stone-100 text-stone-800 text-[10px] font-bold px-2 py-0.5 rounded">Điều chỉnh</span>';
+
+        const qtyColor = Number(m.quantityChanged) > 0 ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold';
+        const dateStr = new Date(m.createdAt).toLocaleString('vi-VN');
+
+        tr.innerHTML = `
+          <td class="p-3.5 text-stone-500 font-medium">${dateStr}</td>
+          <td class="p-3.5">${typeBadge}</td>
+          <td class="p-3.5 font-bold text-stone-900">${m.ingredient ? m.ingredient.name : 'N/A'}</td>
+          <td class="p-3.5 ${qtyColor}">${Number(m.quantityChanged) > 0 ? '+' : ''}${Number(m.quantityChanged).toLocaleString()} ${m.ingredient ? m.ingredient.unit : ''}</td>
+          <td class="p-3.5 text-stone-500">${Number(m.quantityBefore).toLocaleString()}</td>
+          <td class="p-3.5 font-semibold text-stone-800">${Number(m.quantityAfter).toLocaleString()}</td>
+          <td class="p-3.5 font-mono text-[11px] text-stone-700">${m.referenceCode || '-'}</td>
+          <td class="p-3.5 text-stone-500 text-[11px]">${m.notes || '-'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function openRestockModal() {
+      const select = document.getElementById('restock-ingredient-select');
+      select.innerHTML = '';
+      ingredients.forEach(i => {
+        const opt = document.createElement('option');
+        opt.value = i.id;
+        opt.innerText = `${i.name} (Tồn hiện tại: ${i.currentQuantity}${i.unit})`;
+        select.appendChild(opt);
+      });
+      document.getElementById('restock-qty').value = '';
+      document.getElementById('restock-ref').value = `PO-${Date.now().toString().slice(-6)}`;
+      document.getElementById('restock-notes').value = '';
+      document.getElementById('modal-restock').classList.remove('hidden');
+    }
+
+    function openRestockFor(ingId) {
+      openRestockModal();
+      document.getElementById('restock-ingredient-select').value = ingId;
+    }
+
+    function closeRestockModal() {
+      document.getElementById('modal-restock').classList.add('hidden');
+    }
+
+    async function submitRestock() {
+      const ingId = Number(document.getElementById('restock-ingredient-select').value);
+      const qty = Number(document.getElementById('restock-qty').value);
+      const ref = document.getElementById('restock-ref').value.trim();
+      const notes = document.getElementById('restock-notes').value.trim();
+
+      if (!qty || qty <= 0) {
+        showToast('Vui lòng nhập lượng cần nhập lớn hơn 0', 'warning');
+        return;
+      }
+
+      try {
+        const mutation = `
+          mutation Restock($ingredientId: Int!, $quantityAdded: Decimal!, $referenceCode: String, $notes: String) {
+            restockIngredient(ingredientId: $ingredientId, quantityAdded: $quantityAdded, referenceCode: $referenceCode, notes: $notes) {
+              id
+              name
+              currentQuantity
+            }
+          }
+        `;
+        await gql(mutation, {
+          ingredientId: ingId,
+          quantityAdded: qty.toString(),
+          referenceCode: ref,
+          notes: notes,
+        });
+        showToast('Đã nhập kho thành công và ghi nhận nhật ký!', 'success');
+        closeRestockModal();
+        loadInventoryData();
+      } catch (err) {}
+    }
+
+    // --- 7. SHIFT MANAGEMENT & RECONCILIATION ---
+    async function loadShiftSummary() {
+      const card = document.getElementById('shift-details-card');
+      card.innerHTML = `<div class="p-8 text-center text-stone-500 text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Đang tải dữ liệu ca...</div>`;
+
+      try {
+        const query = `
+          query {
+            activeShift {
+              id
+              cashierName
+              status
+              openingCash
+              closingCash
+              cashSales
+              transferSales
+              totalSales
+              expectedCash
+              cashDiscrepancy
+              openedAt
+              closedAt
+            }
+          }
+        `;
+        const data = await gql(query);
+        activeShift = data.activeShift;
+        renderShiftChip();
+
+        if (!activeShift || activeShift.status !== 'OPEN') {
+          card.innerHTML = `
+            <div class="text-center py-10 space-y-3">
+              <div class="w-16 h-16 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center text-2xl mx-auto">
+                <i class="fa-solid fa-vault"></i>
+              </div>
+              <h3 class="text-base font-bold text-stone-800">Hiện Tại Chưa Mở Ca Làm Việc</h3>
+              <p class="text-xs text-stone-500 max-w-sm mx-auto">Vui lòng mở ca làm việc mới để bắt đầu nhận đơn và quản lý đối soát két tiền</p>
+              <button onclick="openOpenShiftModal()" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-xs shadow-md shadow-brand-500/20">
+                <i class="fa-solid fa-door-open mr-1"></i> Mở Ca Mới Ngay
+              </button>
+            </div>
+          `;
+          return;
+        }
+
+        const openedTime = new Date(activeShift.openedAt).toLocaleString('vi-VN');
+        card.innerHTML = `
+          <div class="flex items-center justify-between border-b border-stone-200 pb-4">
+            <div>
+              <span class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full border border-emerald-200">
+                Ca Đang Hoạt Động #${activeShift.id}
+              </span>
+              <h3 class="text-lg font-bold text-stone-900 mt-2">Thu Ngân: ${activeShift.cashierName}</h3>
+              <p class="text-xs text-stone-500">Mở lúc: ${openedTime}</p>
+            </div>
+            <button onclick="openCloseShiftModal()" class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-600/20">
+              <i class="fa-solid fa-lock mr-1"></i> Chốt Ca & Đối Soát
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="p-4 bg-stone-50 rounded-xl border border-stone-200 space-y-1">
+              <p class="text-stone-500 text-xs">Tiền mặt đầu ca:</p>
+              <p class="text-base font-extrabold text-stone-900">${formatMoney(activeShift.openingCash)}</p>
+            </div>
+            <div class="p-4 bg-emerald-50/70 rounded-xl border border-emerald-200 space-y-1">
+              <p class="text-emerald-700 text-xs font-semibold">Doanh thu Tiền mặt:</p>
+              <p class="text-base font-extrabold text-emerald-800">+${formatMoney(activeShift.cashSales)}</p>
+            </div>
+            <div class="p-4 bg-sky-50/70 rounded-xl border border-sky-200 space-y-1">
+              <p class="text-sky-700 text-xs font-semibold">Doanh thu Chuyển khoản QR:</p>
+              <p class="text-base font-extrabold text-sky-800">+${formatMoney(activeShift.transferSales)}</p>
+            </div>
+            <div class="p-4 bg-brand-50 rounded-xl border border-brand-200 space-y-1">
+              <p class="text-brand-800 text-xs font-bold">Tổng doanh thu ca:</p>
+              <p class="text-base font-extrabold text-brand-700">${formatMoney(activeShift.totalSales)}</p>
+            </div>
+          </div>
+
+          <div class="p-5 bg-stone-900 text-white rounded-2xl flex items-center justify-between shadow-lg">
+            <div>
+              <p class="text-xs text-stone-400 font-medium">Tiền mặt dự kiến có trong két (Đầu ca + Doanh thu mặt):</p>
+              <p class="text-2xl font-black text-amber-400 mt-1">${formatMoney(activeShift.expectedCash)}</p>
+            </div>
+            <div class="text-right text-xs text-stone-400">
+              <p>Mọi đơn bị HỦY tự động được loại trừ khỏi doanh thu</p>
+              <p class="mt-1">Đối soát chính xác 100%</p>
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        console.error('Lỗi nạp shift summary:', err);
+      }
+    }
+
+    function openOpenShiftModal() {
+      document.getElementById('open-shift-cashier').value = '';
+      document.getElementById('open-shift-cash').value = '1000000';
+      document.getElementById('open-shift-notes').value = '';
+      document.getElementById('modal-open-shift').classList.remove('hidden');
+    }
+
+    function closeOpenShiftModal() {
+      document.getElementById('modal-open-shift').classList.add('hidden');
+    }
+
+    async function submitOpenShift() {
+      const cashier = document.getElementById('open-shift-cashier').value.trim();
+      const cash = Number(document.getElementById('open-shift-cash').value) || 0;
+      const notes = document.getElementById('open-shift-notes').value.trim();
+
+      if (!cashier) {
+        showToast('Vui lòng nhập tên thu ngân', 'warning');
+        return;
+      }
+
+      try {
+        const mutation = `
+          mutation OpenShift($cashierName: String!, $openingCash: Decimal!, $notes: String) {
+            openShift(cashierName: $cashierName, openingCash: $openingCash, notes: $notes) {
+              id
+              cashierName
+              status
+            }
+          }
+        `;
+        await gql(mutation, {
+          cashierName: cashier,
+          openingCash: cash.toString(),
+          notes: notes,
+        });
+        showToast('Mở ca làm việc mới thành công!', 'success');
+        closeOpenShiftModal();
+        loadInitialData();
+        loadShiftSummary();
+      } catch (err) {}
+    }
+
+    function openCloseShiftModal() {
+      if (!activeShift) return;
+      document.getElementById('modal-close-expected').innerText = formatMoney(activeShift.expectedCash);
+      document.getElementById('close-shift-cash').value = '';
+      document.getElementById('close-shift-notes').value = '';
+      document.getElementById('discrepancy-preview').classList.add('hidden');
+      document.getElementById('modal-close-shift').classList.remove('hidden');
+    }
+
+    function closeCloseShiftModal() {
+      document.getElementById('modal-close-shift').classList.add('hidden');
+    }
+
+    function calculateDiscrepancyPreview() {
+      if (!activeShift) return;
+      const expected = Number(activeShift.expectedCash) || 0;
+      const actual = Number(document.getElementById('close-shift-cash').value) || 0;
+      const diff = actual - expected;
+      const box = document.getElementById('discrepancy-preview');
+
+      box.classList.remove('hidden', 'bg-emerald-100', 'text-emerald-800', 'bg-rose-100', 'text-rose-800', 'bg-stone-100', 'text-stone-800');
+      if (diff === 0) {
+        box.classList.add('bg-emerald-100', 'text-emerald-800');
+        box.innerText = 'Số tiền thực tế khớp chính xác với dự kiến (Không chênh lệch)';
+      } else if (diff < 0) {
+        box.classList.add('bg-rose-100', 'text-rose-800');
+        box.innerText = `Chênh lệch: THIẾU ${formatMoney(Math.abs(diff))} so với dự kiến`;
+      } else {
+        box.classList.add('bg-sky-100', 'text-sky-800');
+        box.innerText = `Chênh lệch: DƯ ${formatMoney(diff)} so với dự kiến`;
+      }
+    }
+
+    async function submitCloseShift() {
+      const actualCash = Number(document.getElementById('close-shift-cash').value) || 0;
+      const notes = document.getElementById('close-shift-notes').value.trim();
+
+      try {
+        const mutation = `
+          mutation CloseShift($closingCash: Decimal!, $notes: String) {
+            closeShift(closingCash: $closingCash, notes: $notes) {
+              id
+              status
+              cashDiscrepancy
+            }
+          }
+        `;
+        const res = await gql(mutation, {
+          closingCash: actualCash.toString(),
+          notes: notes,
+        });
+        showToast('Chốt ca làm việc thành công!', 'success');
+        closeCloseShiftModal();
+        loadInitialData();
+        loadShiftSummary();
+      } catch (err) {}
+    }
+
+    // Auto-polling for KDS every 5 seconds if on KDS tab
+    setInterval(() => {
+      const kdsPanel = document.getElementById('view-kds');
+      if (kdsPanel && !kdsPanel.classList.contains('hidden')) {
+        loadKdsOrders();
+      }
+    }, 5000);
+
+    // Initial load on startup
+    window.addEventListener('DOMContentLoaded', () => {
+      loadInitialData();
+    });
+  </script>
+</body>
+</html>

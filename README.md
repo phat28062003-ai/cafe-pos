@@ -1,6 +1,8 @@
 # Dự Án Cafe POS, Inventory & Real-Time Order API (Bản v2)
 
-Hệ thống backend lõi cho quán cà phê và cửa hàng đồ uống xây dựng trên nền tảng **Django**, **Strawberry GraphQL** và **Django Channels (ASGI)**.
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/phat28062003-ai/cafe-pos)
+
+Hệ thống backend lõi cho quán cà phê và cửa hàng đồ uống xây dựng trên nền tảng **Django**, **Strawberry GraphQL** và **Django Channels (ASGI)**, tích hợp sẵn giao diện **Frontend POS & Barista KDS** chuyên nghiệp.
 
 Hệ thống tích hợp toàn diện quy trình vận hành thực tế qua một GraphQL endpoint duy nhất (`/graphql/`), hỗ trợ đồng thời cả **HTTP (Query / Mutation)** và **WebSocket (Subscription)**.
 
